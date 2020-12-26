@@ -1,26 +1,27 @@
--- Задача 109.
--- Вывести:
--- 1. Названия всех квадратов черного или белого цвета.
--- 2. Общее количество белых квадратов.
--- 3. Общее количество черных квадратов.
+/*
+Задача 109.
+Вывести:
+1. Названия всех квадратов черного или белого цвета.
+2. Общее количество белых квадратов.
+3. Общее количество черных квадратов.
+ */
 
-USE painting
-GO
+USE painting;
 
-SELECT A.Q_NAME         AS q_name,
-       A.Whites         AS whites,
-       A.Cnt - A.Whites AS blacks
-FROM (SELECT Q.Q_ID,
-             Q.Q_NAME,
-             (SUM(SUM(B.B_VOL)) OVER ()) / 765 AS Whites, --10
-             COUNT(*) OVER ()                  AS Cnt --12
-      FROM utQ AS Q
-               LEFT JOIN utB AS B
-                         ON Q.Q_ID = B.B_Q_ID
-      GROUP BY Q.Q_ID,
-               Q.Q_NAME
-      HAVING SUM(B.B_VOL) = 765
-          OR SUM(B.B_VOL) IS NULL) AS A
+SELECT sub.Q_NAME           AS q_name,
+       sub.Whites           AS whites,
+       sub.Cnt - sub.Whites AS blacks
+FROM (SELECT utq.Q_ID,
+             utq.Q_NAME,
+             (SUM(SUM(utb.B_VOL)) OVER ()) / 765 AS Whites, --10
+             COUNT(*) OVER ()                    AS Cnt     --12
+      FROM utQ AS utq
+          LEFT JOIN utB AS utb
+              ON utq.Q_ID = utb.B_Q_ID
+      GROUP BY utq.Q_ID,
+               utq.Q_NAME
+      HAVING SUM(utb.B_VOL) = 765
+          OR SUM(utb.B_VOL) IS NULL) AS sub
 GO
 +---------------+---------+---------+
 |   q_name      |  whites |  blacks |
