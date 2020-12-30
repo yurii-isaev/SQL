@@ -1,4 +1,7 @@
 /*
+Ранжирующие функции — это функции, которые возвращают значение для каждой строки группы в результирующем наборе данных.
+На практике они могут быть использованы, например, для простой нумерации списка,
+составления рейтинга или постраничной выборки.
 Функции ранжирования являются не детерминированными,
 то есть при одних и тех же входных значениях они могут возвращать разный результат.
 
@@ -136,9 +139,8 @@ WHERE No > 1
 GO
 
 -- Удалим повторяющтеся строки при помощи обобщенного табличного выражения.
-WITH CTE AS (SELECT ROW_NUMBER() over (
-    PARTITION BY [Название (RU)]
-    ORDER BY [Название (RU)]) AS No,
+WITH CTE AS (SELECT ROW_NUMBER() OVER
+    (PARTITION BY [Название (RU)] ORDER BY [Название (RU)]) AS No,
                  [Название (RU)],
                  [Название (LAT)],
                  [Химическое обозначение],
@@ -148,3 +150,127 @@ DELETE
 FROM CTE
 WHERE No > 1
 GO
+
+SELECT Product,
+       Price,
+       RANK() OVER (ORDER BY Price desc)       AS Rank,
+       ROW_NUMBER() OVER (ORDER BY Price desc) AS Row_number
+FROM dbo.Order_s
+GO
++---------+---------+-------+------------+
+| Product |  Price  | Rank  | Row_number |
++---------+---------+-------+------------+
+| First   | 64.0000 |   1   |      1     |
+| Fourth  | 49.0000 |   2   |      2     |
+| Fourth  | 36.0000 |   3   |      3     |
+| First   | 25.0000 |   4   |      4     |
+| Fourth  | 16.0000 |   5   |      5     |
+| Second  |  9.0000 |   6   |      6     |
+| Fourth  |  9.0000 |   6   |      7     |
+| Third   |  8.0000 |   8   |      8     |
+| Fourth  |  7.0000 |   9   |      9     |
+| Fourth  |  6.0000 |  10   |     10     |
+| Fourth  |  6.0000 |  10   |     11     |
+| Second  |  5.0000 |  12   |     12     |
+| Third   |  4.0000 |  13   |     13     |
+| Third   |  4.0000 |  13   |     14     |
+| Fourth  |  3.0000 |  15   |     15     |
+| Third   |  2.0000 |  16   |     16     |
+| Fourth  |  2.0000 |  16   |     17     |
+| First   |  1.0000 |  18   |     18     |
+| Second  |  1.0000 |  18   |     19     |
+| First   |  1.0000 |  18   |     20     |
++---------+---------+-------+------------+
+
+-- Отличия нумерации RANK от ROW_NUMBER.
+SELECT Product,
+       Price,
+       RANK() OVER (PARTITION BY Product ORDER BY Price DESC)       AS Rank,
+       ROW_NUMBER() OVER (PARTITION BY Product ORDER BY Price DESC) AS Row_number
+FROM dbo.Order_s
+GO
++---------+---------+-------+------------+
+| Product |  Price  | Rank  | Row_number |
++---------+---------+-------+------------+
+| First   | 64.0000 |   1   |     1      |
+| First   | 25.0000 |   2   |     2      |
+| First   |  1.0000 |   3   |     3      |
+| First   |  1.0000 |   3   |     4      |
+| Fourth  | 49.0000 |   1   |     1      |
+| Fourth  | 36.0000 |   2   |     2      |
+| Fourth  | 16.0000 |   3   |     3      |
+| Fourth  |  9.0000 |   4   |     4      |
+| Fourth  |  7.0000 |   5   |     5      |
+| Fourth  |  6.0000 |   6   |     6      |
+| Fourth  |  6.0000 |   6   |     7      |
+| Fourth  |  3.0000 |   8   |     8      |
+| Fourth  |  2.0000 |   9   |     9      |
+| Second  |  9.0000 |   1   |     1      |
+| Second  |  5.0000 |   2   |     2      |
+| Second  |  1.0000 |   3   |     3      |
+| Third   |  8.0000 |   1   |     1      |
+| Third   |  4.0000 |   2   |     2      |
+| Third   |  4.0000 |   2   |     3      |
+| Third   |  2.0000 |   4   |     4      |
++---------+---------+-------+------------+
+
+SELECT Product,
+       Price,
+       DENSE_RANK() OVER (ORDER BY Price DESC) AS Dense_rank,
+       ROW_NUMBER() OVER (ORDER BY Price DESC) AS Row_number
+FROM dbo.Order_s
+GO
++---------+---------+------------+------------+
+| Product |  Price  | Dense_rank | Row_number |
++---------+---------+------------+------------+
+| First   | 64.0000 |      1     |      1     |
+| Fourth  | 49.0000 |      2     |      2     |
+| Fourth  | 36.0000 |      3     |      3     |
+| First   | 25.0000 |      4     |      4     |
+| Fourth  | 16.0000 |      5     |      5     |
+| Second  |  9.0000 |      6     |      6     |
+| Fourth  |  9.0000 |      6     |      7     |
+| Third   |  8.0000 |      7     |      8     |
+| Fourth  |  7.0000 |      8     |      9     |
+| Fourth  |  6.0000 |      9     |     10     |
+| Fourth  |  6.0000 |      9     |     11     |
+| Second  |  5.0000 |     10     |     12     |
+| Third   |  4.0000 |     11     |     13     |
+| Third   |  4.0000 |     11     |     14     |
+| Fourth  |  3.0000 |     12     |     15     |
+| Third   |  2.0000 |     13     |     16     |
+| Fourth  |  2.0000 |     13     |     17     |
+| First   |  1.0000 |     14     |     18     |
+| Second  |  1.0000 |     14     |     19     |
+| First   |  1.0000 |     14     |     20     |
++---------+---------+------------+------------+
+
+SELECT Product,
+       Price,
+       NTILE(2) OVER (ORDER BY Price DESC) AS Ntile
+FROM dbo.Order_s
+GO
++---------+---------+------------+------------+
+| Product |  Price  | Dense_rank |    Ntile   |
++---------+---------+------------+------------+
+| First   | 64.0000 |      1     |      1     |
+| Fourth  | 49.0000 |      2     |      1     |
+| Fourth  | 36.0000 |      3     |      1     |
+| First   | 25.0000 |      4     |      1     |
+| Fourth  | 16.0000 |      5     |      1     |
+| Second  |  9.0000 |      6     |      1     |
+| Fourth  |  9.0000 |      6     |      1     |
+| Third   |  8.0000 |      7     |      1     |
+| Fourth  |  7.0000 |      8     |      1     |
+| Fourth  |  6.0000 |      9     |      1     |
+| Fourth  |  6.0000 |      9     |      2     |
+| Second  |  5.0000 |     10     |      2     |
+| Third   |  4.0000 |     11     |      2     |
+| Third   |  4.0000 |     11     |      2     |
+| Fourth  |  3.0000 |     12     |      2     |
+| Third   |  2.0000 |     13     |      2     |
+| Fourth  |  2.0000 |     13     |      2     |
+| First   |  1.0000 |     14     |      2     |
+| Second  |  1.0000 |     14     |      2     |
+| First   |  1.0000 |     14     |      2     |
++---------+---------+------------+------------+
