@@ -152,3 +152,123 @@ FROM Scores WITH (READUNCOMMITTED);
 -- аналогично
 SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
 SELECT * FROM Scores WITH (NOLOCK);
+
+-- READ COMMITTED SNAPSHOT
+/*
+ Изменим БД Банк. Включим параметр уровня изоляции моментальных снимков на уровне базы данных.
+После включения этого параметра транзакции, указывающие уровень READ COMMITTED,
+используют управления версиями строк вместо блокировок. Если транзакция выполняется с уровнем изоляции READ COMMITTED,
+данные моментального снимка видны всем инструкциям в состоянии,
+которое существовало на момент начала выполнения инструкции.
+*/
+ALTER DATABASE bank
+    SET READ_COMMITTED_SNAPSHOT ON WITH ROLLBACK AFTER 1 SECONDS;
+/*
+Уровень изоляции READ COMMITTED SNAPSHOT
+Оба оптимистических уровня изоляции включаются на уровне базы данных.
+READ COMMITTED SNAPSHOT (RCSI) включается командой ALTER DATABASE SET READ_COMMITTED_SNAPSHOT ON.
+ПрИзменение этого параметра требует монопольного доступа к базе.
+Команда не выполнится, если есть другие подключения к базе.
+Вы можете переключить базу данных в однопользовательский режим
+или использовать команду ALTER DATABASE SET READ_COMMITTED_SNAPSHOT ON WITH ROLLBACK AFTER X SECONDS.
+При этом откатятся все активные транзакции и завершаться все подключения к базе.
+*/
+
+SET LOCK_TIMEOUT 1000;
+SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+SELECT 'Состояние запроса'
+                   AS 'Состояние',
+       Owner,
+       Balance,
+       @@SPID      AS 'Процесс',
+       @@TRANCOUNT AS 'Количество_транзакций'
+FROM Scores
+GO
+
+-- Можно вставить новую строку.
+INSERT INTO Scores ([Account number], Owner, Balance)
+VALUES ('333333333333', 'Krylov', 4000);
+GO
+
+-- Нельзя удалить вставленную строку из текущего сеанса.
+DELETE
+FROM Scores
+WHERE Owner = 'Krylov'
+GO
+
+-- Нельзя удалить строку из сеанса транзакции.
+DELETE
+FROM Scores
+WHERE Owner = 'Petrov'
+GO
+
+-- Изменить счет Петрова нельзя, так как таблица счета заблокирована в другом сеансе.
+UPDATE Scores
+SET Balance += 200
+WHERE Owner = 'Petrov'
+GO
+
+SELECT 'Состояние запроса'
+                   AS 'Состояние',
+       Owner,
+       Balance,
+       @@SPID      AS 'Процесс',
+       @@TRANCOUNT AS 'Количество_транзакций'
+FROM Scores
+GO
+
+/*
+SNAPSHOT является отдельным уровнем изоляции.
+Он должен быть явно задан в коде с помощью команды SET TRANSACTION ISOLATION LEVEL SNAPSHOT
+или с помощью табличного указания WITH (SNAPSHOT).
+
+По умолчанию, использование уровня изоляции SNAPSHOT запрещено.
+Его необходимо включить с помощью команды ALTER DATABASE SET ALLOW_SNAPSHOT_ISOLATION ON.
+Эта команда не требует монопольного доступа к базе и ее можно выполнять когда есть активные пользователи.
+
+Уровень изоляции SNAPSHOT обеспечивает согласованность данных на уровне транзакции.
+Транзакции будут работать с версией данными, зафиксированной на начало транзакции вне зависимости от того,
+сколько транзакция активна и какие изменения происходили с данными в других транзакциях в это время.
+*/
+ALTER DATABASE bank
+    SET ALLOW_SNAPSHOT_ISOLATION ON;
+
+SET TRANSACTION ISOLATION LEVEL SNAPSHOT;
+/*
+Нельзя произвести чтение из сеанса транзакции;
+Транзакции в режиме изоляции моментального снимка не удалось получить доступ к базе данных "bank",
+так как режим изоляции моментального снимка не допускается в этой базе данных.
+Используйте инструкцию ALTER DATABASE для разрешения использования режима изоляции моментального снимка.
+ */
+SELECT *
+FROM Scores
+GO
+
+-- Можно вставить новую строку.
+INSERT INTO Scores ([Account number], Owner, Balance)
+VALUES ('333333333333', 'Krylov', 4000);
+GO
+
+-- Можно удалить вставленную строку из текущего сеанса.
+DELETE
+FROM Scores
+WHERE Owner = 'Krylov'
+GO
+
+-- Можно удалить строку из сеанса транзакции.
+DELETE
+FROM Scores
+WHERE Owner = 'Petrov'
+GO
+
+-- Можно изменить счет Петрова в другом сеансе.
+UPDATE Scores
+SET Balance += 200
+WHERE Owner = 'Petrov'
+GO
+
+-- Нельзя изменить счет Иванова, который заюлокирован транзакцией.
+UPDATE Scores
+SET Balance -= 500
+WHERE Owner = 'Ivanov'
+GO
